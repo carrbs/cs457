@@ -30,6 +30,24 @@ of padTo by composing combine a pipeline of functions.]
 >           . reverse
 
 
+  In my version of padTo, I take the n and the list of strings. First
+  I reverse the list... let's call the string "hello" and set n = 6,
+  the result of reverse gives us:
+
+                       "olleh"
+
+  when we apply the next function (flip (++) [' ',' '..]), we are
+  concating an infinite list of " "s to the end of "olleh":
+
+                       "olleh        ..."
+  but when we only take n of this result (here n = 6), we get:
+
+                       "olleh "
+
+  finally we reverse this list/string and get the desired result:
+
+                      " hello"
+
 b) The purpose of this question is to construct a function, multable,
 that can output (square) multiplication tables of any given size, as
 shown in the following examples:
@@ -64,8 +82,77 @@ portions of the following code with appropriate expressions.
 
 > multable      = putStr . showTable . makeTable
 
+  The function makeTable makes the list of rows I will use
+  in multable (the argument for showTable) By utilizing
+  the group function, we can use the list comprehension
+  below and split it up each time we get to the last
+  item in the list that y is using. Here's an example:
+
+       makeTable 4 = group 4 [x*y | x <- [1..4], y <- [1..4] ]
+
+  without the grouping, this comprehension takes the first
+  element from the x generator (1) and multiplies it with
+  each element from the y generator, storing the result in 
+  a list:
+
+      [1,2,3,4,...]
+
+  Now we'lll go on to the next element in x's generator (2)
+  and repeat the process:
+
+      [1,2,3,4,2,4,6,8,...]
+
+  If we let the whole thing go through all of the x values
+  we get this list:
+
+      [1,2,3,4,2,4,6,8,3,6,9,12,4,8,12,16]
+
+  And then we can apply the group n to this list:
+      [[1,2,3,4],[2,4,6,8],[3,6,9,12],[4,8,12,16]]
+
 > makeTable     :: Int -> [[Int]]
 > makeTable n   = group n [x*y | x <- [1..n], y <-[1..n]]
+
+
+  Now that we have our sweet list of Ints, we need
+  a sweet list of Strings with some padding.
+  First off we need to convert all of our lists to
+  Strings, I used (map.map) show to convert each element
+  of the lists of Ints to Char:
+
+     (map.map) show [[1,2,3,4],[2,4,6,8],[3,6,9,12],[4,8,12,16]]
+      =
+      [ ["1","2","3","4"],["2","4","6","8"],
+        ["3","6","9","12"],["4","8","12","16"]  ]
+  I used an auxilary function (padTable) to deal 
+  with the padding:
+
+      [ ["   1","   2","   3","   4"],
+        ["   2","   4","   6","   8"],
+        ["   3","   6","   9","  12"],
+        ["   4","   8","  12","  16"] ]
+
+  Once I had this list, I used map concat to smoosh
+  the lists of Strings together:
+
+      [ "   1   2   3   4",
+        "   2   4   6   8",
+        "   3   6   9  12",
+        "   4   8  12  16"  ]
+
+  unlines gives me the list as a string with new lines:
+
+  "   1   2   3   4\n   2   4   6   8\n
+      3   6   9  12\n   4   8  12  16\n"
+      (sorry for the page wrap, making sure it all fits)
+
+   this gets fed into putStr in multable, so we get
+   the desired result:
+
+            1   2   3   4
+            2   4   6   8
+            3   6   9  12
+            4   8  12  16
 
 > showTable     :: [[Int]] -> String
 > showTable     = unlines
@@ -77,6 +164,7 @@ portions of the following code with appropriate expressions.
 > padTable table = (map . map) (padTo (n+2)) table
 >                   where n = maximum $ map maximum $ (map . map) length table 
 
+> -- This was borrowed from week 2 lecture
 > group     :: Int -> [a] -> [[a]]
 > group n   = takeWhile (not.null)
 >           . map (take n) 
@@ -105,8 +193,131 @@ Your task is to define a function
 > allWays xs  = show xs : [ appString l r |
 >                               n <- [1..(length(xs) - 1)],
 >                               l <- allWays ((take n) xs ),
->                               r <- allWays ((drop n) xs)   ]
+>                               r <- allWays ((drop n) xs)    ]
 
+
+    I beat my head against this one for a long time, trying
+    to figure out how to acheive it using inits, splits, tails,
+    I knew I wanted to use a list comprehension but I couldn't
+    figure out exactly how to do it using those tools. Hope that
+    wasn't a requirement! Anyway, I took this approach
+    of appending Strings to a list comrehension where I call
+    allWays on the different parts of the list. I worked through
+    this on a whiteboard with Russell Miller and we came up
+    with similar solutions. 
+    
+    Let's work through an example:
+
+                    let xs = [1,2,3]
+
+    when I call allWays xs the first thing that happens is
+    I append show xs to the list comprehension:
+
+                    [ "[1,2,3]" ... ]
+
+    the ... in the list is the rest of the list comprehension.
+    Similarly to the makeTable function we are taking the
+    first item in l and using appString with all the items we
+    get from r. The first time through, n = [1..(length xs) -1)]
+    = [1..2] = 1, and we use this n to take/drop on our list
+    (which at this point is [1,2,3]):
+
+        l <- allWays ((take 1) [1,2,3] = allWays [1]
+        r <- allWays ((drop 1) [1,2,3] = allWays [2,3]
+
+    Now, since we need to run through all the options while
+    l = [1], we call allWays on [2,3], which gives us a new
+    list like this:
+
+              ["[2,3]" ... ]
+
+   but we need to finish this list, so we call the rest of
+   this function:
+
+        l <- allWays ((take 1) [2,3] = allWays [2]
+        r <- allWays ((drop 1) [2,3] = allWays [3]
+
+    and now our l = [2]
+
+    We again call allWays in r, which gives us a new list:
+
+        allWays [3] = show [3] : ...
+              ["[3]" ...]
+
+    But now our n <- [1..(length(xs) -1 ] = []
+    so we don't really apply the allWays at this point.
+    We return to the previous call (the one where our list
+    is ["[2,3]" ... ] with this new list:
+
+                      ["[3]"]
+
+    Before we apply the appString, l = [2] gets passed to
+    allWays, which returns (in a similar fashion to
+    allWays [3]):
+
+                      ["[2]"]
+
+    Now we have the l and r that we can apply appString
+    to:
+        appString "[2]" "[3]"
+        = "([2]++[3])"
+
+    This string gets (:) to the list show [2] so now the 
+    list is:
+            ["[2,3]","([2]++[3])"]
+
+    and we return to the previous call (where l = 1)
+    bringing this list with us.
+
+    Now that we have our complete list for r (when 
+    l = allWays [1], The list that gets returned from
+    allWays [1] = ["[1]"] (similar to above example
+    on allWays [3]) we can start applying the appString
+    at this "top" level:
+
+            l <- ["[1]"]
+            r <- ["[2,3]","([2]++[3])"]
+
+    We are applying appString to these two lists
+    (and consing them to the original ["[1,2,3]",...]
+    list:
+
+          appString "[1]" "[2,3]" = "([1]++[2,3])"
+          appString "[1]" "([2]++[3])" = "([1]++([2]++[3]))"
+
+    Now our top level list looks like this:
+
+    [["[1,2,3]","([1]++[2,3])","([1]++([2]++[3]))",...]
+
+    but we still have a "..." because we've only looked
+    at the first item in our n list (namely 1), now we
+    have to repeat this process when n = 2...
+
+        l <- allWays ((take 2) [1,2,3] = allWays [1,2]
+        r <- allWays ((drop 2) [1,2,3] = allWays [3]
+
+    The return (as described earlier) from allWays [3]
+    will be:
+                        ["[3]"]
+
+    also simlar to the return value of allWays [2,3]:
+
+          allWays [1,2] =["[1,2]","([1]++[2])"]
+
+    When we apply the appString to these two lists we get
+    this list:
+
+        ["([1,2]++[3])","(([1]++[2])++[3])"]
+
+    Which gets appended to the original list:
+
+    [ "[1,2,3]",
+      "([1]++[2,3])",
+      "([1]++([2]++[3]))",
+      "([1,2]++[3])",
+      "(([1]++[2])++[3])" ]
+
+    And we're done!!
 
 that will produce a list of strings that show all of the possible
 ways to build the given list of integers in this way, provided that
@@ -164,9 +375,15 @@ associative.  Write a new function:
 >                               l <- [show ((take n) xs ) ],
 >                               r <- noParens ((drop n) xs)   ]
 
+    to avoid the duplicates, we only need to call noParens on the
+    rhs. This was actually the first thing I figured out, then 
+    realized that it wasn't giving me all the values, so all the
+    logic I worked through on the first half of this problem is
+    essentially the same.
+
+
 > appString2    :: String -> String -> String
 > appString2 l r =  l ++ "++" ++ r
-
 
 that generates a list of strings showing all of the possible
 ways to construct the given input list using only ++ and list
