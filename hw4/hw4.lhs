@@ -1,5 +1,6 @@
 ----------------------------------------------------------------------
 CS457/557 Functional Languages, Winter 2012                 Homework 4
+Benjamin Carr
 ----------------------------------------------------------------------
 
 Due: At the start of class on February 9, 2012 in person, or by noon
@@ -9,7 +10,7 @@ Introduction:
 
 Consider the following definition of a datatype of bits:
 
-> data Bit = O | I    deriving Show
+> data Bit = O | I    deriving (Show, Eq)
 
 This datatype has two different values, written O and I, which we
 will use to represent the bits 0 and 1.  We'll talk more about the
@@ -90,19 +91,22 @@ c) Define a function
 > add []     ds     = ds
 > add ds     []     = ds
 > add (O:ds) (e:es) = [e] ++ (add ds es)
-> add (I:ds) (O:es) = [I] ++ (add ds es)
-> add (I:ds) (I:es) = [O] ++ inc (add ([O] ++ ds) ([O] ++ es))
+> add (e:ds) (O:es) = [I] ++ (add ds es)
+> add (I:ds) (I:es) = [O] ++ add [I] (add ds es)
 
    that computes the sum of its arguments. More formally, your add
    function should satisfy the following law (but your implementation
    should not make any use of Integer values):
 
 
-> add_ x y  = toBinNum (fromBinNum x + fromBinNum y)
+> {--add_ x y  = toBinNum (fromBinNum x + fromBinNum y)
 > foo x y   = add_ (toBinNum x)  (toBinNum y)
 > test_ x y = [ foo a b | a <-[0..x], b <-[0..y] ]
 > baz x y   = add (toBinNum x) (toBinNum y)
-> test x y  = [ baz a b | a <-[0..x], b <-[0..y] ]
+> test x y  = [ baz a b {--, (a,b))--} | a <-[0..x], b <-[0..y] ]
+> -- needed to change to Deriving Eq for this to work (learnyouahaskell.com :-) )
+> checkSame     :: Integer -> Integer -> Bool
+> checkSame x y = (test x y) == (test_ x y) --}
 
    Hint: You might like to look for a definition that uses pattern
    matching on two arguments, together with a little bit of recursion.
@@ -121,7 +125,20 @@ c) Define a function
 
 d) Define a function:
 
-> --mul :: BinNum -> BinNum -> BinNum
+> mul :: BinNum -> BinNum -> BinNum
+> mul xs ys = foldr add [] (multTwo xs ys)
+
+> mulBit        :: Bit -> Bit -> Bit
+> mulBit O y    = O
+> mulBit x O    = O
+> mulBit I I    = I
+
+> multOne       :: Bit -> BinNum -> BinNum
+> multOne x ys = [mulBit x y | y <- ys]
+
+> multTwo [] ys = []
+> multTwo ys [] = []
+> multTwo (x:xs) ys = [multOne x ys] ++ multTwo xs (O:ys)
 
    that computes the product of its arguments (without converting
    them to Integer values first).  If you're not sure how to proceed,
