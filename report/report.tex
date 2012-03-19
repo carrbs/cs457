@@ -1,0 +1,321 @@
+% Author: Benjamin Carr
+% this is a latex file for my project proposal
+% for my Functional Programming class 
+% (CS457) at Portland State University
+% 
+\title{Project Report: WAVE File Delay Program}
+\author{
+        Benjamin Carr \\
+        Computer Science\\
+        Portland State University\\
+        CS322 - Functional Languages\\
+        Prof. Mark P. Jones
+}
+\date{\today}
+
+\documentclass[12pt]{article}
+\usepackage{color}
+\usepackage{graphicx}
+\usepackage{mathtools}
+
+
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+\section{Introduction/Background}
+The program that I created reads in a WAV file and applies an acoustical effect called delay. The model that I used to create the effect is ``analog'' delay or ``tape'' delay. The idea behind this type of delay is that a unaltered or ``dry'' audio signal passes through the delay module towards the output, but the signal is intercepted and split before leaving the module. The amplitude of the intercepted signal is reduced and then some delay of time is applied. After this delay is applied, this quieter signal is mixed together with the dry signal. This mixture (which is on it's way to output) gets split yet again, with the same rules applying. This concept is difficult to describe, but can be clarified with the use of examples and diagrams.
+\\ \\
+Consider this sentence:
+\begin{verbatim}
+                "HELLO HOW ARE YOU DOING TODAY 
+                 THE WEATHER UP HERE IS FINE"
+\end{verbatim}
+Imagine if we wanted to put a microphone up to your lips when you are speaking this sentence. We would need to put the microphone at the beginning of the sentence, something like this:
+\begin{verbatim}
+         [microphone] <--- "HELLO HOW ARE YOU DOING TODAY 
+                            THE WEATHER UP HERE IS FINE"
+\end{verbatim}
+But we'd need also to plug this `microphone' into speakers, to amplify the sound:
+\begin{verbatim}
+
+[speakers] <-- [microphone] <--- "HELLO HOW ARE YOU DOING TODAY 
+                                  THE WEATHER UP HERE IS FINE"
+\end{verbatim}
+Let's simplify some of this with some variables. Let's say your sentence is a WAV file called `greeting.wav':
+\begin{verbatim}
+greeting.wav --> [microphone] --> [speakers]
+\end{verbatim}
+Now, let us replace the microphone with my delay module:
+\begin{verbatim}
+greeting.wav --> [delay] --> [speakers]
+\end{verbatim}
+Here is my best attempt at showing you how the sound would pass through my delay module:
+\begin{center}
+\includegraphics[scale=0.60]{delay.png}
+\end{center}
+%\begin{verbatim}
+%
+%               --------------------------------> output (wet) 
+%               ^                      |          sound
+%greeting.wav   |                      |          
+%input (dry)   _|_      _____      ____v____
+% sound ----> |mix|<---|delay|<---|amplitude|
+%\end{verbatim}
+As the sound leaves the `mix' module, it has two destinations, it will travel to the output but also be fed back into the delay loop that reduces amplification and delays the sound so that when it is mixed with the original sound it occurs at a later time.
+\\ \\
+Getting bask to my original ``greeting'' what you might ``hear'' after the sentence passes through the delay module is:
+\begin{verbatim}
+"H E L L O   H O W   A R E   Y O Uh eDlOlIoN Gh oTwO DaArYe  TyHoEu  
+ WdEoAiTnHgE Rt oUdPa yH EtRhEe  IwSe aFtIhNeEr up here is fine"
+\end{verbatim}
+I created this string using a little function:
+\begin{verbatim}
+sillyDelay [] ys = ys
+sillyDelay xs [] = xs
+sillyDelay (x:xs) (y:ys) = x:y: sillyDelay xs ys
+\end{verbatim}
+This example is not really the best way to understand what this effect does, but it hints at my solution of applying this effect to an actual WAV file. It is difficult to see visually what delay is, so I encourage you to listen to what delay sounds like, it is an aurally pleasing experience. This processing of audio signals was developed some time in the 1940s\footnote{source: http://en.wikipedia.org/wiki/Musique\_concrete} and popularized by Ray Butts' ``EchoSonic'' and Mike Battle's ``Echoplex''\footnote{source: http://en.wikipedia.org/wiki/Delay\_(audio\_effect)\#Analog\_delay}
+
+
+
+\section{What is a WAV file?}
+A WAV file contains audio information. WAV files contain a lot of data, most notably a header that contains some information about the audio that is stored in it\footnote{source: http://en.wikipedia.org/wiki/WAV}. A WAV file stores information about sample rates, channels (i.e. mono, stereo, 5.1 surround sound) and most importantly the actual audio data. Sample rate refers to how many samples per second are taken of the analog sound. These sample are really just numbers representing amplitude. If we take, say 44.1 kHz (or 44,100 samples per second) we can describe the shape of an analog signal. Here is what a wave looks like in the audio manipulation program Audacity:
+\begin{center}
+\includegraphics[scale=0.60]{wav1.png}
+\end{center}
+If we zoom in to the highlighted region of the wave, we might see something like this:
+\begin{center}
+\includegraphics[scale=0.60]{wav2.png}
+\end{center}
+At this level of zoom, we can actually see what looks like a wave, but lets zoom way in there, maybe we can see the individual samples:
+\begin{center}
+\includegraphics[scale=0.70]{wav3.png}
+\end{center}
+The dots in this graphic are the samples (values of amplitude). The line you see in this graphic is drawn by the program Audacity, it's showing you what it thinks the analog wave should look like. Since we have 44,100 dots per second, the analog wave can be easily emulated digitally using this long list of amplitudes. I see about 30 dots in this image, which means this region of the wave represents:\\
+\begin{center}
+\begin{math}
+30/44100 \approx .00068 \approx 0.07\%\end{math} of a second
+\end{center}
+You can see why this makes digital representation of an audio/analog signal possible. This wave file (represented by the first image) is approximately 9 seconds long.
+\\ \\
+If you are unfamiliar with WAV files and digital audio\footnote{http://en.wikipedia.org/wiki/Digital\_audio}, I encourage you to visit the wikipedia pages that I've listed as footnotes on this page and the previous if you have any unanswered questions from this brief overview. The most important point is that a WAV file is a digital representation of sound (Like what you'd find on a CD) and that there is data that describes the audio signal which can be interpreted by computer applications and audio playing devices (i.e. CD player or MP3 player).
+
+\section{How I implemented the delay program}
+I used a module called Codec.Wav that is part of a Hackage Haskell Library called Hcodecs\footnote{http://hackage.haskell.org/package/HCodecs-0.2.2}. Codec.wav is a self proclaimed "module for reading and writing of WAVE (.wav) audio files." and I found this module to be the perfect thing for this project. For my purposes (and most I'd presume), the most important things I would need to get out of the file are:
+\begin{itemize}
+\item the sample rate
+\item the audio data
+\end{itemize}
+Using the module was simple (with the guidance of Prof. Mark P. Jones). The first function I used was called \begin{tt}importFile\end{tt}:
+\begin{verbatim}
+importFile :: (MArray IOUArray a IO, IArray UArray a, 
+               Audible a, AudibleInWav a)
+                => FilePath -> IO (Either String (Audio a))
+\end{verbatim}
+This function takes a .wav file as input and (upon success) gives us an audio
+object. The audio object constructor is:
+\begin{verbatim}
+data Audio a = Audio {
+    sampleRate :: Int
+  , channelNumber :: Int
+  , sampleData :: SampleData a
+  }
+\end{verbatim}
+the type of sample data is:
+\begin{verbatim}
+type SampleData a = UArray Int a
+\end{verbatim}
+an Immutable array\footnote{http://hackage.haskell.org/packages/archive/array/0.3.0.3/doc/html/Data-Array-IArray.html} whose elements are the samples. This is great because that is what I need in Haskell, a list of stuff! Here is how I handle getting a .wav file imported into my program:
+\begin{verbatim}
+main = do w <- importFile "audioFile.wav" 
+          case w of
+            Left msg    -> putStr ("failure: " ++ msg)
+            Right audio -> delay audio
+\end{verbatim}
+Once I have obtained this audio object, I pass it off to my delay function.
+
+\begin{verbatim}
+delay      :: Audio Int16 -> IO()
+delay audio = let samples    = sampleData audio
+                  xs         = elems samples
+                  processed  = processor xs 16000
+                  out        = listArray (0, length processed) processed
+                  nsamples   = audio{sampleData=out}
+               in exportFile "newdelay.wav" nsamples\end{verbatim}
+Here is where we extract the elements of the audio object and assign them to a list of integers representing amplitude. You can see that the incoming Audio file has a restriction of Int16, which is integers in the range of  -32768 to 32767. The processor function takes this list, along with the amount of delay we'd like to apply. The code for that function is here:
+\begin{verbatim}
+processor xs n | maximum xs > 1   = ys
+               | otherwise        = xs
+                 where ys  = zipTwo safePlus xs ds
+                       ds  = processor (pad ++ amp 0.66 xs) n
+                       pad = replicate n 0
+\end{verbatim}
+We first examine the list, and see that if the maximum value in our list of amplitudes is greater than one (meaning there is relevant data in the list) then we will use my zipTwo function (similar to ZipWith) which will ``zipWith'' the two list together using a function, but also with another special property; Since our two lists are of different length, we must append the rest of the longer list to the new list we've created by use of zipTwo:
+\begin{verbatim}
+zipTwo:: (Int16 -> Int16 -> Int16) -> [Int16] -> [Int16] -> [Int16]
+zipTwo f (xs) []       = xs
+zipTwo f [] (ys)       = ys
+zipTwo f (x:xs) (y:ys) = f x y : zipTwo f xs ys
+\end{verbatim}
+Here is the definition for \begin{tt}safePlus\end{tt} :
+\begin{verbatim}
+safePlus x y | x > 0 && y > 0 && s < 0 = max
+             | x < 0 && y < 0 && s > 0 = min
+             | otherwise               = s
+               where s   = x + y
+                     max = 32767  :: Int16
+                     min = -32768 :: Int16
+\end{verbatim}
+The first list we pass to \begin{tt}zipTwo\end{tt} is \begin{tt}xs\end{tt}, which is our original list. Recall that our list is \begin{tt}::Int16\end{tt} which are limited to a range from -32768 to 32767. The reason we need \begin{tt}safePlus\end{tt} is that if when we are adding the elements from the to lists we need to have a threshold barrier that says ``well, this number is 32,000, and this other number is 1,000. If I add those together (33,000) I'm gonna go over the limit of a 16 Bit int. So, instead of adding them together I'll just substitute the max value for that result.'' Here is an image depicting how this function manipulates the data to compensate for ``overages'':
+\begin{center}
+\includegraphics[scale=0.70]{wav4.png}
+\end{center}
+You can see that the natural shape of the wave appears that it would like to continue past -1.0, but the wave cannot travel into the Nether. \begin{tt}safePlus\end{tt} guards against this behavior. 
+\\ \\
+Finally let's take a look at what the amp function does. \begin{tt}ds\end{tt}, the second list we're calling with \begin{tt}zipTwo\end{tt} we use the function \begin{tt}amp\end{tt} to reduce the amplitude:
+\begin{verbatim}
+amp n list    = let floats = map (*n) (map fromIntegral list)
+                 in map round floats
+\end{verbatim}
+this function simply takes a list of numbers and reduces the amplitude of each item in the list. Aurally this function makes the list quieter. Now that we have this less amplified list and the original list we zip them together and make a recursive call to processor and start the whole process over. But this time we have a longer list, and this list has the original audio signal in it ``mixed'' with a quieter one that occurs after the time we specified.
+\\ \\
+This loop continues until there is no longer relevant data in the list, in which case we just return that list, recursion stops and we return first to \begin{tt}processor\end{tt} and then to \begin{tt}delay\end{tt}.The list we get back from \begin{tt}processor\end{tt} in the function \begin{tt}delay\end{tt} represents the sound with delay applied to it. Similar to the way we extracted this list from the Audio object, we now need to replace it with this new list. the function listArray gives us the capability. Here is the type signature for listArray:
+\begin{verbatim}
+listArray :: (IArray a e, Ix i) => (i, i) -> [e] -> a i e
+\end{verbatim}
+The first argument list array expects is the indices from which to build the new array from a list, since we want the whole list to be in the array we give bounds of zero to the length of the list. Now that we have the audio data as an array, we can assign it to the audio object:
+\begin{verbatim}
+newAudio   = audio{sampleData=out}
+\end{verbatim}
+and use another function \begin{tt}exportFile\end{tt}:
+\begin{verbatim}
+exportFile :: FilePath -> Audio a -> IO ()
+\end{verbatim}
+from the \begin{tt}Codec.Wav\end{tt} module that reverses the \begin{tt}importFile\end{tt} function, essentially letting us create a new WAV file with the delayed sound.
+
+
+\section{Intellect \& Preliminary Work}
+This project turned out to be easier than I was fearing. Once I was able to get the audio data out of the wave file using the Codec.Wav module I was ready to apply intelligent treatments to the list of samples. When I first was able to read the data in and get my ``audio-as-list'' Prof. Mark P Jones and I experimented with some quick list transformations that showed us that I was on the right track. We first used the Prelude function \begin{tt}reverse\end{tt} to reverse the order of the list. This essentially made the audio sample backwards. This was a funny but also exciting turning point in my project and put me in the position to start manipulating the data to get the desired effect.
+\\ \\
+My first solution to this delay module was to take the list of numbers (or sampleData):
+\begin{verbatim}
+source = [1,8,4,5,2,-1,-8,-3,1,...]
+\end{verbatim}
+and take every other number out of the list.:
+\begin{verbatim}
+sourceHalf = [1,4,2,-8,1,...]
+\end{verbatim}
+Now, I make a new list and add 10,000 zeroes to the head (and also add 10,000 zeroes to the end of the original list):
+\begin{verbatim}
+newSource  = sourceHalf ++ replicate 10,000 0
+delayed    = replicate 10,000 0 ++ sourceHalf
+\end{verbatim}
+We can see that \begin{tt}length(newSource) = length(delayed)\end{tt}, which is what I wanted in this preliminary solution of delay because my next action was to take these two lists and combine them by alternately taking one element of list \begin{tt}newSource\end{tt} and \begin{tt}delayed\end{tt}, like shuffling cards, something like this:
+\begin{verbatim}
+alternate []     []     = []
+alternate (xs)   []     = xs
+alternate []     (ys)   = ys
+alternate (x:xs) (y:ys) = [x,y] ++ alternate xs ys
+\end{verbatim}
+I wrote all this code up and it worked well, but I realized I was losing a lot (half) of the data by using this implementation. Coincidentally I was speaking with a classmate of mine (Eric O'Connell) who said he had done a similar project in a different language for another class. He reminded me that ``combining two waves is a simple as adding them together, remember? From Physics?''. So, I completely rethought my process of how I would be ``mixing'' the two waves together. When I applied this physics property to my lists, the result was exactly what I hoped for, except that I was getting digital distortion or ``clipping''\footnote{http://en.wikipedia.org/wiki/Clipping\_(signal\_processing)\#Digital\_processing}. I asked Prof. Jones about this and he suggested opening the file with the Audacity program; (I felt silly for not coming up with this idea!). When we opened the file we saw strange results:
+\begin{center}
+\includegraphics[scale=0.60]{clip.png}
+\end{center}
+I was just adding the two numbers from the lists together, but sometimes they were both very large numbers whose sum was larger than a 16 bit integer. Approaching that threshold of 16 bit integers we find this behavior:
+\\ \\
+(At GHCi prompt)
+\begin{verbatim}
+---
+*Main> 32767::Int16
+32767
+*Main> 32768::Int16
+-32768
+*Main> 32769::Int16
+-32767
+*Main> 32768 + 32768
+65536
+*Main> 65536::Int16
+0
+---
+\end{verbatim}
+You can see why it was necessary for me to implement the \begin{tt}safePlus\end{tt}
+function in order to avoid this behavior.
+
+
+
+
+\section{Future plans for this project}
+Now that I've gotten my feet with this audio manipulation using this module, I feel enthusiastic about finding ways to create other effects (i.e. Reverb, Compression, Distortion, Phase Shifting). These effects could be included in an ``effects'' module that people could load into their program. Once they are able to read a WAV file in to their own project, this library would be easy to use and might have the effect(s) they're looking for. If not, they might find inspiration with the effects I've implemented and might wish to contribute to the library. I hope to add at least these effects and push this code to a public place (Hackage\footnote{http://hackage.haskell.org : a collection of releases of Haskell packages.} + github?) where people could add and hopefully optimize some of the implementation. Optimization needs to be looked at in this code as well, as it stands it takes quite a while for the processing.
+\newpage
+\section{Appendix A: Repository}
+
+I prepared this document using \LaTeX. I have a repository at github.com
+\begin{center}
+https://github.com/carrbs
+\end{center}
+
+You will find the Haskell code I used for this document as well as the \LaTeX code I used to typeset this document at:
+\begin{center}
+https://github.com/carrbs/cs457/tree/master/sound
+\end{center}
+
+
+\section{Appendix B: sound.lhs}
+\begin{verbatim}
+> import Codec.Wav
+> import Data.Audio
+> import Data.Word
+> import Data.Int
+> import Data.Array.IArray
+> import Data.List
+
+> main :: IO ()
+> main  = do w <- importFile "audacity/guitarMono.wav"
+>            case w of
+>              Left msg    -> putStr ("fail: " ++ msg)
+>              Right audio -> delay audio
+
+> delay      :: Audio Int16 -> IO()
+> delay audio = let samples    = sampleData audio
+>                   xs         = elems samples
+>                   processed  = processor xs 16000
+>                   out        = listArray (0, length processed) processed
+>                   nsamples   = audio{sampleData=out}
+>                in exportFile "newdelay.wav" nsamples
+
+> processor     :: [Int16] -> Int -> [Int16]
+> processor xs n | maximum xs > 100 = ys
+>                | otherwise        = xs
+>                  where ys  = zipTwo safePlus xs ds
+>                        ds  = processor (pad ++ amp 0.66 xs) n
+>                        pad = replicate n 0
+
+Int16 are limited to this range: -32768 - 32767. For our purposes in this
+program, the larger the abs(x), the larger the amplitude. We must keep
+positive and negative numbers where they are, so this function will safely
+add two numbers and keep there  sign. If the number is larger than the
+"threshold" (somewhere's around abs(32767), we'll just use that "max" value
+in place of the larger number.
+
+> zipTwo                :: (Int16 -> Int16 -> Int16) -> [Int16] -> [Int16] -> [Int16]
+> zipTwo f (xs) []       = xs
+> zipTwo f [] (ys)       = ys
+> zipTwo f (x:xs) (y:ys) = f x y : zipTwo f xs ys
+
+> safePlus    :: Int16 -> Int16 -> Int16
+> safePlus x y | x > 0 && y > 0 && s < 0 = max
+>              | x < 0 && y < 0 && s > 0 = min
+>              | otherwise               = s
+>                where s   = x + y
+>                      max = 32767  :: Int16
+>                      min = -32768 :: Int16
+
+> amp :: (RealFrac a1, Integral a, Integral b) => a1 -> [a] -> [b]
+> amp n list    = let floats = map (*n) (map fromIntegral list)
+>                  in map round floats
+\end{verbatim}
+\end{document}
+  
